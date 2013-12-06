@@ -1,7 +1,4 @@
 ﻿module Problem080 =
-
-    open System.Numerics
-
     let groups n = seq {
         let rec fullpart n = seq {
             match n / 100 with
