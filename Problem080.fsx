@@ -10,17 +10,16 @@
 
     let sqrtDigits n = seq {
         let rec digits remainder (groups : int seq) current = seq {
-            let minuend = remainder * (bigint 100) + (bigint (Seq.head groups))
-            let subtrahend = current * (bigint 2) * (bigint 10)
-            let digit = [0..9] |> Seq.takeWhile (fun x -> (subtrahend + (bigint x)) * (bigint x) <= minuend) |> Seq.last
-            yield digit
-            yield! digits (minuend - (subtrahend + (bigint digit)) * (bigint digit)) (groups |> Seq.skip 1) (current * (bigint 10) + (bigint digit)) }
+            let minuend = remainder * 100I + (bigint (Seq.head groups))
+            let subtrahend = current * 2I * 10I
+            let digit = [0I..9I] |> Seq.takeWhile (fun x -> (subtrahend + x) * x <= minuend) |> Seq.last
+            yield int digit
+            yield! digits (minuend - (subtrahend + digit) * digit) (groups |> Seq.skip 1) (current * 10I + digit) }
         let groups = groups n
-        let group = Seq.head groups
-        let first = int (sqrt (float group))
-        let remainder = (bigint group) - (bigint first) * (bigint first)
-        yield first
-        yield! digits remainder (groups |> Seq.skip 1) (bigint first) }
+        let group = bigint (Seq.head groups)
+        let first = bigint (sqrt (float group))
+        yield int first
+        yield! digits (group - first * first) (groups |> Seq.skip 1) first }
 
     let isIrrational n =
         let sq = int (sqrt (float n))
