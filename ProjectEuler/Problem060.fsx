@@ -15,27 +15,44 @@ open System.Collections.Generic
 
 module Problem060 =
 
-    let knownPrimes = new SortedSet<int>();
+    let knownPrimes = new SortedSet<int>([2; 3]);
+
+    let rec checkIfPrime (ps: IEnumerator<int>) value sqrtValue =
+        if ps.MoveNext() then
+            match ps.Current with
+            | n when n >= sqrtValue -> true
+            | n when value % n = 0 -> false
+            | _ -> checkIfPrime ps value sqrtValue
+        else true
+
+    let rec isPrime num =
+        let maxPrime = knownPrimes.Max
+        match num > maxPrime with
+        | true ->
+            let rec findNextPrime checkNum =
+                match checkIfPrime (knownPrimes.GetEnumerator()) checkNum ((Math.Sqrt(float checkNum) |> int) + 1) with
+                | true -> knownPrimes.Add(checkNum) |> ignore
+                | _ -> findNextPrime (checkNum + 2)
+            findNextPrime (maxPrime + 2)
+            isPrime num
+        | _ -> knownPrimes.Contains(num)
 
     let primeSeq = seq {
-        let rec checkIfPrime (ps: IEnumerator<int>) value sqrtValue =
-            if ps.MoveNext() then
-                match ps.Current with
-                | n when n >= sqrtValue -> true
-                | n when value % n = 0 -> false
-                | _ -> checkIfPrime ps value sqrtValue
-            else true
-        knownPrimes.Add(2) |> ignore
         yield 2
-        knownPrimes.Add(3) |> ignore
         yield 3
         let lastValue = ref 3
         while true do
             lastValue := !lastValue + 2
-            if checkIfPrime (knownPrimes.GetEnumerator()) !lastValue ((Math.Sqrt(float !lastValue) |> int) + 1) then
-                knownPrimes.Add(!lastValue) |> ignore
+            if isPrime !lastValue then
                 yield !lastValue
     }
+
+    let combineNum a b =
+        let rec getDec d =
+            match d * 10 with
+            | x when x < b -> getDec x
+            | x -> x
+        a * (getDec 1) + b
 
     let splits prime =
         let rec split rank = seq {
@@ -43,9 +60,10 @@ module Problem060 =
             if nr < prime then
                 match prime % nr with
                 | x when x < rank -> ()
-                | x -> let t = prime / nr
-                       if knownPrimes.Contains(t) && knownPrimes.Contains(x) then
-                            yield (prime / nr, x)
+                | x ->
+                    let t = prime / nr
+                    if (isPrime t) && (isPrime x) && (isPrime (combineNum x t)) then
+                        yield (prime / nr, x)
                 yield! split nr
         }
         split 1 |> Seq.toArray
@@ -60,38 +78,50 @@ module Problem060 =
     let primeSets3 = Dictionary<int * int * int, SortedSet<int>>()
     let primeSets4 = Dictionary<int * int * int * int, SortedSet<int>>()
 
-    let addPrimeSet3 a b c =
-        let mkKey p1 p2 p3 =
-            let s = set([p1, p2, p3]) |> Set.toArray
+    let addPrimeSet3 a b c d =
+        let mkKey k1 k2 k3 =
+            let s = set([k1; k2; k3]) |> Set.toArray
             (s.[0], s.[1], s.[2])
-        let addPs3 = addToPrimeSet primeSets3
-        Set.intersect (set primeSets2.[a]) (set primeSets1.[b])
-        |> Set.iter (fun x -> addPs3 (mkKey (fst a) (snd a) b) x
-                              addPs3 (mkKey (fst a) (snd a) x) b
-                              addPs3 (mkKey b x) a)
+        addToPrimeSet primeSets3 (mkKey a b c) d
+        addToPrimeSet primeSets3 (mkKey a c d) b
+        addToPrimeSet primeSets3 (mkKey a b d) c
+        addToPrimeSet primeSets3 (mkKey b c d) a
+        Set.intersectMany [(set primeSets1.[a]); (set primeSets1.[b]); (set primeSets1.[c]); (set primeSets1.[d])]
+            |> Set.iter (ignore)
 
-    let addPrimeSet2 a b =
-        let mkKey p1 p2 = (min p1 p2, max p1 p2)
-        let addPs2 = addToPrimeSet primeSets2
-        Set.intersect (set primeSets1.[a]) (set primeSets1.[b])
-        |> Set.iter (fun x -> addPs2 (mkKey a b) x
-                              addPs2 (mkKey a x) b
-                              addPs2 (mkKey b x) a
-                              addPrimeSet3 a b x)
+    let addPrimeSet2 a b c =
+        let mkKey x y = (min x y, max x y)
+        addToPrimeSet primeSets2 (mkKey a b) c
+        addToPrimeSet primeSets2 (mkKey a c) b
+        addToPrimeSet primeSets2 (mkKey b c) a
+        Set.intersectMany [(set primeSets2.[mkKey a b]); (set primeSets2.[mkKey a c]); (set primeSets2.[mkKey b c])]
+            |> Set.iter (addPrimeSet3 a b c)
 
     let addPrimeSet1 a b =
-        let addPs1 = addToPrimeSet primeSets1
-        addPs1 a b
-        addPs1 b a
-        addPrimeSet2 a b
+        addToPrimeSet primeSets1 a b
+        addToPrimeSet primeSets1 b a
+        match a, b with
+        |   3, 7 -> printfn "(  37)   3: %A" (primeSets1.[3] |> Seq.toArray)
+                    printfn "(  37)   7: %A" (primeSets1.[7] |> Seq.toArray)
+        |   7, 3 -> printfn "(  73)   3: %A" (primeSets1.[3] |> Seq.toArray)
+                    printfn "(  73)   7: %A" (primeSets1.[7] |> Seq.toArray)
+        | 109, 3 -> printfn "(1093) 109: %A" (primeSets1.[109] |> Seq.toArray)
+                    printfn "(1093)   3: %A" (primeSets1.[3] |> Seq.toArray)
+        | 109, 7 -> printfn "(1097) 109: %A" (primeSets1.[109] |> Seq.toArray)
+                    printfn "(1097)   7: %A" (primeSets1.[7] |> Seq.toArray)
+        | _ -> ()
+        Set.intersect (set primeSets1.[a]) (set primeSets1.[b])
+            |> Set.iter (addPrimeSet2 a b)
 
     primeSeq
-    |> Seq.take 1000
+    |> Seq.take 10000
     |> Seq.map (fun x -> (x, x |> splits))
     |> Seq.filter (fun (_, y) -> y.Length > 0)
-    |> Seq.tryFind (fun (x, y) ->
+    |> Seq.tryFind (fun (_, y) ->
         y |> Seq.iter (fun (a, b) -> addPrimeSet1 a b)
         primeSets3 |> Seq.isEmpty |> not
         )
 
-    primeSets2 |> Seq.iter (fun x -> printfn "%O: %A" x.Key (x.Value |> Seq.toArray))
+    //primeSets3 |> Seq.iter (fun x -> printfn "%O: %A" x.Key (x.Value |> Seq.toArray))
+
+    //printfn "%d" knownPrimes.Max
