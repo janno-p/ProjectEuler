@@ -60,25 +60,37 @@ module Problem060 =
     let primeSets3 = Dictionary<int * int * int, SortedSet<int>>()
     let primeSets4 = Dictionary<int * int * int * int, SortedSet<int>>()
 
+    let addPrimeSet3 a b c =
+        let mkKey p1 p2 p3 =
+            let s = set([p1, p2, p3]) |> Set.toArray
+            (s.[0], s.[1], s.[2])
+        let addPs3 = addToPrimeSet primeSets3
+        Set.intersect (set primeSets2.[a]) (set primeSets1.[b])
+        |> Set.iter (fun x -> addPs3 (mkKey (fst a) (snd a) b) x
+                              addPs3 (mkKey (fst a) (snd a) x) b
+                              addPs3 (mkKey b x) a)
+
+    let addPrimeSet2 a b =
+        let mkKey p1 p2 = (min p1 p2, max p1 p2)
+        let addPs2 = addToPrimeSet primeSets2
+        Set.intersect (set primeSets1.[a]) (set primeSets1.[b])
+        |> Set.iter (fun x -> addPs2 (mkKey a b) x
+                              addPs2 (mkKey a x) b
+                              addPs2 (mkKey b x) a
+                              addPrimeSet3 a b x)
+
     let addPrimeSet1 a b =
         let addPs1 = addToPrimeSet primeSets1
         addPs1 a b
         addPs1 b a
-
-    let addPrimeSet2 a b =
-        let addPs2 = addToPrimeSet primeSets2
-        Set.intersect (set primeSets1.[a]) (set primeSets1.[b])
-        |> Set.iter (fun x -> addPs2 (min a b, max a b) x
-                              addPs2 (min a x, max a x) b
-                              addPs2 (min b x, max b x) a)
+        addPrimeSet2 a b
 
     primeSeq
     |> Seq.take 1000
     |> Seq.map (fun x -> (x, x |> splits))
     |> Seq.filter (fun (_, y) -> y.Length > 0)
     |> Seq.tryFind (fun (x, y) ->
-        y |> Seq.iter (fun (a, b) -> addPrimeSet1 a b
-                                     addPrimeSet2 a b)
+        y |> Seq.iter (fun (a, b) -> addPrimeSet1 a b)
         primeSets3 |> Seq.isEmpty |> not
         )
 
