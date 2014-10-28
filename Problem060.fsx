@@ -14,66 +14,72 @@ open System
 open System.Collections.Generic
 
 module Problem060 =
-    type Primo () =
-        let knownPrimes = new SortedSet<int>()
 
-        let mutable lastValue = 0
+    let knownPrimes = new SortedSet<int>();
 
-        let testPrime (n : int) =
-            let max = Math.Sqrt(float n) |> int
-            let rec test (e : IEnumerator<int>) =
-                if e.MoveNext() then
-                    let p = e.Current
-                    if p > max then
-                        true
-                    elif n % p = 0 then
-                        false
-                    else
-                        test e
-                else
-                    true
-            test (knownPrimes.GetEnumerator())
+    let primeSeq = seq {
+        let rec checkIfPrime (ps: IEnumerator<int>) value sqrtValue =
+            if ps.MoveNext() then
+                match ps.Current with
+                | n when n >= sqrtValue -> true
+                | n when value % n = 0 -> false
+                | _ -> checkIfPrime ps value sqrtValue
+            else true
+        knownPrimes.Add(2) |> ignore
+        yield 2
+        knownPrimes.Add(3) |> ignore
+        yield 3
+        let lastValue = ref 3
+        while true do
+            lastValue := !lastValue + 2
+            if checkIfPrime (knownPrimes.GetEnumerator()) !lastValue ((Math.Sqrt(float !lastValue) |> int) + 1) then
+                knownPrimes.Add(!lastValue) |> ignore
+                yield !lastValue
+    }
 
-        member this.Next
-            with get () =
-                let rec next cur =
-                    let n = cur + 1
-                    match testPrime n with
-                    | true -> knownPrimes.Add n |> ignore
-                              n
-                    | _ -> next n
-                match knownPrimes.Count with
-                | 0 -> knownPrimes.Add 2 |> ignore
-                       2
-                | _ -> next knownPrimes.Max
-
-        member this.IsPrime n =
-            match n with
-            | x when x > knownPrimes.Max -> false
-            | _ -> knownPrimes.Contains(n)
-
-    let splits n =
-        let rec split r = seq {
-            let nr = r * 10
-            if nr < n then
-                match n % nr with
-                | x when x < r -> ()
-                | x -> yield (n / nr, x)
+    let splits prime =
+        let rec split rank = seq {
+            let nr = rank * 10
+            if nr < prime then
+                match prime % nr with
+                | x when x < rank -> ()
+                | x -> let t = prime / nr
+                       if knownPrimes.Contains(t) && knownPrimes.Contains(x) then
+                            yield (prime / nr, x)
                 yield! split nr
         }
-        split 1
+        split 1 |> Seq.toArray
 
+    let addToPrimeSet (pset: Dictionary<'T,SortedSet<int>>) key value =
+        match pset.TryGetValue key with
+        | true, vset -> vset.Add(value) |> ignore
+        | _ -> pset.[key] <- new SortedSet<int>([value])
 
-    let primo = new Primo()
-    let rec proov () =
-        match primo.Next with
-        | x when x > 10000 -> ()
-        | x -> ()
+    let primeSets1 = Dictionary<int, SortedSet<int>>()
+    let primeSets2 = Dictionary<int * int, SortedSet<int>>()
+    let primeSets3 = Dictionary<int * int * int, SortedSet<int>>()
+    let primeSets4 = Dictionary<int * int * int * int, SortedSet<int>>()
 
-    [ 0 .. 9 ] |> Seq.iter (fun _ -> printfn "%d" primo.Next)
-    printfn "2 is prime: %b" (primo.IsPrime 2)
-    printfn "3 is prime: %b" (primo.IsPrime 3)
+    let addPrimeSet1 a b =
+        let addPs1 = addToPrimeSet primeSets1
+        addPs1 a b
+        addPs1 b a
 
-    splits 1709 |> Seq.iter (fun (x, y) -> printfn "(%d, %d)" x y)
+    let addPrimeSet2 a b =
+        let addPs2 = addToPrimeSet primeSets2
+        Set.intersect (set primeSets1.[a]) (set primeSets1.[b])
+        |> Set.iter (fun x -> addPs2 (min a b, max a b) x
+                              addPs2 (min a x, max a x) b
+                              addPs2 (min b x, max b x) a)
 
-    ()
+    primeSeq
+    |> Seq.take 1000
+    |> Seq.map (fun x -> (x, x |> splits))
+    |> Seq.filter (fun (_, y) -> y.Length > 0)
+    |> Seq.tryFind (fun (x, y) ->
+        y |> Seq.iter (fun (a, b) -> addPrimeSet1 a b
+                                     addPrimeSet2 a b)
+        primeSets3 |> Seq.isEmpty |> not
+        )
+
+    primeSets2 |> Seq.iter (fun x -> printfn "%O: %A" x.Key (x.Value |> Seq.toArray))
